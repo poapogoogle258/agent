@@ -21,7 +21,6 @@ function getIPAddress() {
   
 
 function main(){
-    var node_service = []
     var content_servers = false
     var host = getIPAddress()
 
@@ -49,6 +48,7 @@ function main(){
 
 
     function get_resource(){
+        var node_service = []
 
         readbackupdata()
 
@@ -74,26 +74,31 @@ function main(){
                 })
 
                 const options = {
-                    hostname: 'whatever.com',
-                    port: 3000,
+                    hostname: '962c-2001-44c8-4240-e64a-9c7a-fb01-337d-aa5a.ngrok.io',
                     path: '/api/history',
+                    //port: 3000,
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Content-Length': data.length
-                    }
+                    },
                 }
-        
-                console.log(data)
-                
+                        
                 const req = https.request(options, res => {
                     content_servers = true
-                } )
-                req.on('error', error => {
-                    content_servers = false
-                    console.log(data)
+                    res.on('data', d => {
+                        process.stdout.write(d)
+                    })
                 })
                 
+                req.on('error', error => {
+                    content_servers = false
+                    console.log(`error : ${error}`)
+                })
+                
+                req.write(data)
+                req.end()
+
                 //end programd
                 pm2.disconnect() 
             })
@@ -101,7 +106,7 @@ function main(){
 
         setTimeout(() => {
             get_resource()
-        }, 5000 , 'stoping send resouce to servers');
+        }, 10000 , 'stoping send resouce to servers');
     }
 
     //start get resource
