@@ -1,8 +1,10 @@
 const pm2 = require('pm2')
 const osu = require('node-os-utils');
-const os = require('os')
-const https = require('https');
+const { io } = require("socket.io-client");
 
+const exec = require("child_process").exec
+
+const socket = io("http://localhost:3000");
 
 
 function getIPAddress() {
@@ -20,100 +22,74 @@ function getIPAddress() {
   }
   
 
-function main(){
+async function main(){
     var content_servers = false
-    var host = getIPAddress()
-
-    const pathfile = './backupfile'
-
-
-    //demo
-    const writebackupdata = (data) => {
-        const fs = require('fs')
-        //
-
-        fs.appendFile(pathfile,data, err => {
-            fs.writeFile(pathfile,data)
-        })
-    }
-    //demo
-    const readbackupdata = async () =>{
-        const fs = require('fs')
-        fs.readFile(pathfile, 'utf-8',(err , data) => {
-            if(!err){
-                https.request(options,data)
-            }
-        })
-    }
-
 
     function get_resource(){
         var node_service = []
+        var host = getIPAddress()
 
-        readbackupdata()
 
         pm2.connect(async function(err){
             content_servers = (err)? false : true
 
             pm2.list(async function(err,list_pm2){    
                 content_servers = (err)? false : true
-
-                list_pm2.forEach(process_node => {
-                    node_service.push({'name' : process_node['pm2_env']['name'], 'status' : process_node['pm2_env']['status'] })
-                });
-                // post data to host
-                const mem = await osu.mem.info()
-                const cpu = await osu.cpu.usage()
+                
+                // get status nginx
+                exec('sudo service nginx status', async(error,stdout,stderr) => {
+                    list_pm2.forEach(process_node => {
+                        node_service.push({'name' : process_node['pm2_env']['name'], 'status' : process_node['pm2_env']['status'] })
+                    });
+                    // post data to host
+                    const mem = await osu.mem.info()
+                    const cpu = await osu.cpu.usage()
+        
+                    const data = {
+                        'host' : host,
+                        'cpu' : cpu,
+                        'memory' : mem['usedMemPercentage'],
+                        'node_service' : node_service,
+                        'nginx' : stdout.includes('active (running)'), // stop = inactive (dead) , start = active (running)
+                        'time' : Date.now()
+                    }
     
-                const data = JSON.stringify({
-                    'host' : host,
-                    'cpu' : cpu,
-                    'memory' : mem['usedMemPercentage'],
-                    'nodes' : node_service,
-                    'time' : Date.now()
+                    socket.emit('send_status',data)
+    
+    
+                    //end programd
+                    pm2.disconnect()                     
                 })
-
-                const options = {
-                    hostname: '962c-2001-44c8-4240-e64a-9c7a-fb01-337d-aa5a.ngrok.io',
-                    path: '/api/history',
-                    //port: 3000,
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Content-Length': data.length
-                    },
-                }
-                        
-                const req = https.request(options, res => {
-                    content_servers = true
-                    res.on('data', d => {
-                        process.stdout.write(d)
-                    })
-                })
-                
-                req.on('error', error => {
-                    content_servers = false
-                    console.log(`error : ${error}`)
-                })
-                
-                req.write(data)
-                req.end()
-
-                //end programd
-                pm2.disconnect() 
             })
         })
-
-        setTimeout(() => {
-            get_resource()
-        }, 10000 , 'stoping send resouce to servers');
     }
 
-    //start get resource
-    get_resource()
+    // loop every 2 secount
+    while(true){
+        get_resource()
+        await new Promise(r => setTimeout(r,2 * 1000))
+    }
 }
 
-//run app.js
-main()
+
+socket.on('connect',function() {
+    //run app.js
+    console.log(`connecttion data `)
+    //start socket
+    socket.emit('send_status',{
+        'host' : getIPAddress(),
+        'cpu' : 0,
+        'memory' :0,
+        'node_service' : [],
+        'time' : Date.now()
+    })
+    main()
+});
+
+socket.on('disconnect',() => {
+    console.log(`connecttion data `)
+    console.log(socket.id)
+})
+
 
 
