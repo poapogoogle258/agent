@@ -4,7 +4,7 @@ const { io } = require("socket.io-client");
 
 const exec = require("child_process").exec
 
-const socket = io("http://localhost:3000",{
+const socket = io("http://83c7-171-103-38-206.ngrok.io",{
 
 });
 var sendermessage = false
