@@ -4,7 +4,10 @@ const { io } = require("socket.io-client");
 
 const exec = require("child_process").exec
 
-const socket = io("http://localhost:3000");
+const socket = io("http://localhost:3000",{
+
+});
+var sendermessage = false
 
 
 function getIPAddress() {
@@ -19,7 +22,7 @@ function getIPAddress() {
       }
     }
     return '0.0.0.0';
-  }
+}
   
 
 async function main(){
@@ -69,13 +72,19 @@ async function main(){
         get_resource()
         await new Promise(r => setTimeout(r,2 * 1000))
     }
-}
+}   
 
 
-socket.on('connect',function() {
+socket.on('connect',function(data) {
     //run app.js
     console.log(`connecttion data `)
     //start socket
+
+    socket.on('assign_sender',function(){
+        sendermessage = true
+        console.log('be sender')
+    })
+
     socket.emit('send_status',{
         'host' : getIPAddress(),
         'cpu' : 0,
@@ -91,5 +100,43 @@ socket.on('disconnect',() => {
     console.log(socket.id)
 })
 
+socket.on("connect_error", (error) => {
+    if(sendermessage){
+        send_message(`Big Servers Down dont can connect`)
+        sendermessage = false
+        setTimeout(() => {
+            sendermessage = true
+        }, 1000 * 60 * 5);
+    }
+    console.log('error')
+  });
+
+// line notify message
+const send_message = (message) => {
+    var axios = require('axios');
+    var qs = require('qs');
+    var data = qs.stringify({
+      'message': message 
+    });
+    var config = {
+      method: 'post',
+      url: 'https://notify-api.line.me/api/notify',
+      headers: { 
+        'Authorization': 'Bearer B6yPj7gOCjsVuhn9MhZjbYgqwwcnM3AxrQRhDtt3MvU', 
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      data : data
+    };
+  
+    axios(config)
+    .then(function (response) {
+      console.log(JSON.stringify(response.data));
+    })
+    .catch(function (error) {
+      console.log(error);
+    });
+  
+    console.log('sended message')
+}
 
 
